@@ -130,6 +130,22 @@ class EffectPanel extends JPanel {
 			emitterTable.getSelectionModel().setSelectionInterval(row, row);
 		}
 	}
+	
+	void cloneEmitter () {
+        int row = emitterTable.getSelectedRow();
+        if (row == -1) {
+            return;
+        }
+        Array<ParticleEmitter> emitters = editor.effect.getEmitters();
+        final ParticleEmitter sourceEmitter = emitters.get(row);
+        final ParticleEmitter emitter = new ParticleEmitter(sourceEmitter);
+        String name = emitterTableModel.getValueAt(row, 0) + " (copy)";
+        emitter.setName(name);
+        emitter.setImagePath(sourceEmitter.getImagePath());
+        emitter.setPosition(sourceEmitter.getX(), sourceEmitter.getY());
+        emitters.add(emitter);
+        emitterTableModel.addRow(new Object[] {name, true});
+    }
 
 	void emitterSelected () {
 		int row = emitterTable.getSelectedRow();
@@ -294,6 +310,17 @@ class EffectPanel extends JPanel {
 					}
 				});
 			}
+			
+			{
+                JButton downButton = new JButton("Clone");
+                sideButtons.add(downButton, new GridBagConstraints(0, -1, 1, 1, 0, 0, GridBagConstraints.CENTER,
+                    GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
+                downButton.addActionListener(new ActionListener() {
+                    public void actionPerformed (ActionEvent event) {
+                        cloneEmitter();
+                    }
+                });
+            }
 		}
 		{
 			JScrollPane scroll = new JScrollPane();
