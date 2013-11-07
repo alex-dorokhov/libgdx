@@ -79,11 +79,15 @@ public class ParticleEditor extends JFrame {
 	ParticleEffect effect = new ParticleEffect();
     File effectFile;
 	final HashMap<ParticleEmitter, ParticleData> particleData = new HashMap();
+	
+	private Renderer renderer;
 
 	public ParticleEditor () {
 		super("Particle Editor");
 
-		lwjglCanvas = new LwjglCanvas(new Renderer(), false);
+		this.renderer = new Renderer();
+		
+		lwjglCanvas = new LwjglCanvas(renderer, false);
 		addWindowListener(new WindowAdapter() {
 			public void windowClosed (WindowEvent event) {
 				System.exit(0);
@@ -103,8 +107,10 @@ public class ParticleEditor extends JFrame {
 		EventQueue.invokeLater(new Runnable() {
 			public void run () {
 				editRowsPanel.removeAll();
+
 				addEditorRow(new NumericPanel(pixelsPerMeter, "Pixels per meter", ""));
 				addEditorRow(new NumericPanel(zoomLevel, "Zoom level", ""));
+				addEditorRow(new BgImagePanel(ParticleEditor.this));
 				addEditorRow(new NumericPanel(deltaMultiplier, "Delta multiplier", ""));
 
 				rowsPanel.removeAll();
@@ -297,6 +303,10 @@ public class ParticleEditor extends JFrame {
 		}
 		splitPane.setDividerLocation(325);
 	}
+	
+	public void setBackground(String path){
+	    renderer.setBackground(path);
+	}
 
 	class Renderer implements ApplicationListener, InputProcessor {
 		private float maxActiveTimer;
@@ -456,6 +466,10 @@ public class ParticleEditor extends JFrame {
 				});
 				emitter.setImagePath(null);
 			}
+		}
+		
+		public void setBackground(String path){
+		    bgImage = new Sprite(new Texture(Gdx.files.absolute(path)));
 		}
 
 		public boolean keyDown (int keycode) {
