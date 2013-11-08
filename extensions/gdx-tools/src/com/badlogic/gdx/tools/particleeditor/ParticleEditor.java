@@ -77,6 +77,7 @@ public class ParticleEditor extends JFrame {
 	float zoomLevelPrev;
 
 	ParticleEffect effect = new ParticleEffect();
+    File effectFile;
 	final HashMap<ParticleEmitter, ParticleData> particleData = new HashMap();
 
 	public ParticleEditor () {
@@ -428,12 +429,25 @@ public class ParticleEditor extends JFrame {
 			String imageName = new File(imagePath.replace('\\', '/')).getName();
 			try {
 				FileHandle file;
-				if (imagePath.equals("particle.png"))
+				if (imagePath.equals("particle.png")) {
 					file = Gdx.files.classpath(imagePath);
-				else
-					file = Gdx.files.absolute(imagePath);
+                } else {
+                    if ((imagePath.contains("/") || imagePath.contains("\\")) && !imageName.contains("..")) {
+					    file = Gdx.files.absolute(imagePath);
+                        if (!file.exists()) {
+                            // try to use image in effect directory
+                            file = Gdx.files.absolute(new File(effectFile.getParentFile(),
+                                    imageName).getAbsolutePath());
+                        }
+                    } else {
+                        file = Gdx.files.absolute(new File(effectFile.getParentFile(), imagePath).getAbsolutePath());
+                    }
+                }
 				emitter.setSprite(new Sprite(new Texture(file)));
-			} catch (GdxRuntimeException ex) {
+                if (effectFile != null) {
+                    emitter.setImagePath(effectFile.getParentFile().toURI().relativize(file.file().toURI()).getPath());
+                }
+            } catch (GdxRuntimeException ex) {
 				ex.printStackTrace();
 				EventQueue.invokeLater(new Runnable() {
 					public void run () {

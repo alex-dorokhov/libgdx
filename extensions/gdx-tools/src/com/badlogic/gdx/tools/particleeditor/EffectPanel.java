@@ -23,6 +23,7 @@ import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.net.URI;
 
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
@@ -168,8 +169,10 @@ class EffectPanel extends JPanel {
 		lastDir = dir;
 		ParticleEffect effect = new ParticleEffect();
 		try {
-			effect.loadEmitters(Gdx.files.absolute(new File(dir, file).getAbsolutePath()));
+            File effectFile = new File(dir, file);
+			effect.loadEmitters(Gdx.files.absolute(effectFile.getAbsolutePath()));
 			editor.effect = effect;
+            editor.effectFile = effectFile;
 			emitterTableModel.getDataVector().removeAllElements();
 			editor.particleData.clear();
 		} catch (Exception ex) {
@@ -196,10 +199,22 @@ class EffectPanel extends JPanel {
 		if (dir == null || file == null || file.trim().length() == 0) return;
 		lastDir = dir;
 		int index = 0;
-		for (ParticleEmitter emitter : editor.effect.getEmitters())
-			emitter.setName((String)emitterTableModel.getValueAt(index++, 0));
+        File effectFile = new File(dir, file);
+
+        // save each image path as relative path to effect file directory
+        URI effectDirUri = effectFile.getParentFile().toURI();
+		for (ParticleEmitter emitter : editor.effect.getEmitters()){
+			emitter.setName((String) emitterTableModel.getValueAt(index++, 0));
+            String imagePath = emitter.getImagePath();
+            if ((imagePath.contains("/") || imagePath.contains("\\")) && !imagePath.contains("..")) {
+                // it's absolute, make it relative:
+                URI imageUri = new File(emitter.getImagePath()).toURI();
+                emitter.setImagePath(effectDirUri.relativize(imageUri).getPath());
+            }
+		}
+
 		try {
-			editor.effect.save(new File(dir, file));
+			editor.effect.save(effectFile);
 		} catch (Exception ex) {
 			System.out.println("Error saving effect: " + new File(dir, file).getAbsolutePath());
 			ex.printStackTrace();
