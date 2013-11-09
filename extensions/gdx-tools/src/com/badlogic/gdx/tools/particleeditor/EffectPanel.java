@@ -197,6 +197,9 @@ class EffectPanel extends JPanel {
 		String file = dialog.getFile();
 		String dir = dialog.getDirectory();
 		if (dir == null || file == null || file.trim().length() == 0) return;
+        if (!file.matches(".+[.].+$")) {
+            file = file + ".p";
+        }
 		lastDir = dir;
 		int index = 0;
         File effectFile = new File(dir, file);
