@@ -16,7 +16,6 @@
 
 package com.badlogic.gdx.utils.reflect;
 
-import com.badlogic.gdx.utils.GdxRuntimeException;
 import com.badlogic.gwtref.client.ReflectionCache;
 import com.badlogic.gwtref.client.Type;
 
@@ -34,21 +33,21 @@ public final class ClassReflection {
 	}
 
 	/** Returns the simple name of the underlying class as supplied in the source code. */
-	static public String getSimpleName(Class c) {
-		return c.getName();
+	static public String getSimpleName (Class c) {
+		return c.getSimpleName();
 	}
-	
+
 	/** Determines if the supplied Object is assignment-compatible with the object represented by supplied Class. */
 	static public boolean isInstance (Class c, Object obj) {
-		return isAssignableFrom(c, obj.getClass());
+		return obj != null && isAssignableFrom(c, obj.getClass());
 	}
 
 	/** Determines if the class or interface represented by first Class parameter is either the same as, or is a superclass or
-	 * superinterface of, the class or interface represented by the second Class parameter. */	
+	 * superinterface of, the class or interface represented by the second Class parameter. */
 	static public boolean isAssignableFrom (Class c1, Class c2) {
 		Type c1Type = ReflectionCache.getType(c1);
 		Type c2Type = ReflectionCache.getType(c2);
-		return c2Type.isAssignableFrom(c1Type);
+		return c1Type.isAssignableFrom(c2Type);
 	}
 
 	/** Returns true if the class or interface represented by the supplied Class is a member class. */
@@ -63,22 +62,45 @@ public final class ClassReflection {
 
 	/** Creates a new instance of the class represented by the supplied Class. */
 	static public <T> T newInstance (Class<T> c) throws ReflectionException {
-		return (T)ReflectionCache.getType(c).newInstance();
+		try {
+			return (T)ReflectionCache.getType(c).newInstance();
+		} catch (NoSuchMethodException e) {
+			throw new ReflectionException("Could not use default constructor of " + c.getName(), e);
+		}
 	}
 
 	/** Returns an array of {@link Constructor} containing the public constructors of the class represented by the supplied Class. */
 	static public Constructor[] getConstructors (Class c) {
-		throw new GdxRuntimeException("Not implemented.");
+		com.badlogic.gwtref.client.Constructor[] constructors = ReflectionCache.getType(c).getConstructors();
+		Constructor[] result = new Constructor[constructors.length];
+		for (int i = 0, j = constructors.length; i < j; i++) {
+			result[i] = new Constructor(constructors[i]);
+		}
+		return result;
 	}
 
-	/** Returns a {@link Constructor} that represents the public constructor for the supplied class which takes the supplied parameter types. */
+	/** Returns a {@link Constructor} that represents the public constructor for the supplied class which takes the supplied
+	 * parameter types. */
 	static public Constructor getConstructor (Class c, Class... parameterTypes) throws ReflectionException {
-		throw new GdxRuntimeException("Not implemented.");
+		try {
+			return new Constructor(ReflectionCache.getType(c).getConstructor(parameterTypes));
+		} catch (SecurityException e) {
+			throw new ReflectionException("Security violation while getting constructor for class: " + c.getName(), e);
+		} catch (NoSuchMethodException e) {
+			throw new ReflectionException("Constructor not found for class: " + c.getName(), e);
+		}
 	}
 
-	/** Returns a {@link Constructor} that represents the constructor for the supplied class which takes the supplied parameter types. */
+	/** Returns a {@link Constructor} that represents the constructor for the supplied class which takes the supplied parameter
+	 * types. */
 	static public Constructor getDeclaredConstructor (Class c, Class... parameterTypes) throws ReflectionException {
-		throw new GdxRuntimeException("Not implemented.");
+		try {
+			return new Constructor(ReflectionCache.getType(c).getDeclaredConstructor(parameterTypes));
+		} catch (SecurityException e) {
+			throw new ReflectionException("Security violation while getting constructor for class: " + c.getName(), e);
+		} catch (NoSuchMethodException e) {
+			throw new ReflectionException("Constructor not found for class: " + c.getName(), e);
+		}
 	}
 
 	/** Returns an array of {@link Method} containing the public member methods of the class represented by the supplied Class. */
@@ -91,7 +113,8 @@ public final class ClassReflection {
 		return result;
 	}
 
-	/** Returns a {@link Method} that represents the public member method for the supplied class which takes the supplied parameter types. */
+	/** Returns a {@link Method} that represents the public member method for the supplied class which takes the supplied parameter
+	 * types. */
 	static public Method getMethod (Class c, String name, Class... parameterTypes) throws ReflectionException {
 		try {
 			return new Method(ReflectionCache.getType(c).getMethod(name, parameterTypes));
@@ -161,4 +184,38 @@ public final class ClassReflection {
 		}
 	}
 
+	/** Returns true if the supplied class includes an annotation of the given class type. */
+	static public boolean isAnnotationPresent (Class c, Class<? extends java.lang.annotation.Annotation> annotationType) {
+		java.lang.annotation.Annotation[] annotations = ReflectionCache.getType(c).getDeclaredAnnotations();
+		for (java.lang.annotation.Annotation annotation : annotations) {
+			if (annotation.annotationType().equals(annotationType)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** Returns an array of {@link Annotation} objects reflecting all annotations declared by the supplied class,
+	 * or an empty array if there are none. Does not include inherited annotations. */
+	static public Annotation[] getDeclaredAnnotations (Class c) {
+		java.lang.annotation.Annotation[] annotations = ReflectionCache.getType(c).getDeclaredAnnotations();
+		Annotation[] result = new Annotation[annotations.length];
+		for (int i = 0; i < annotations.length; i++) {
+			result[i] = new Annotation(annotations[i]);
+		}
+		return result;
+	}
+
+	/** Returns an {@link Annotation} object reflecting the annotation provided, or null of this field doesn't
+	 * have such an annotation. This is a convenience function if the caller knows already which annotation
+	 * type he's looking for. */
+	static public Annotation getDeclaredAnnotation (Class c, Class<? extends java.lang.annotation.Annotation> annotationType) {
+		java.lang.annotation.Annotation[] annotations = ReflectionCache.getType(c).getDeclaredAnnotations();
+		for (java.lang.annotation.Annotation annotation : annotations) {
+			if (annotation.annotationType().equals(annotationType)) {
+				return new Annotation(annotation);
+			}
+		}
+		return null;
+	}
 }

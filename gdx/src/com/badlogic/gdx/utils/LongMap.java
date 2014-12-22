@@ -28,7 +28,7 @@ import com.badlogic.gdx.math.MathUtils;
  * depending on hash collisions. Load factors greater than 0.91 greatly increase the chances the map will have to rehash to the
  * next higher POT size.
  * @author Nathan Sweet */
-public class LongMap<V> {
+public class LongMap<V> implements Iterable<LongMap.Entry<V>> {
 	private static final int PRIME1 = 0xbe1f14b1;
 	private static final int PRIME2 = 0xb4b82e39;
 	private static final int PRIME3 = 0xced1c241;
@@ -81,6 +81,17 @@ public class LongMap<V> {
 
 		keyTable = new long[capacity + stashCapacity];
 		valueTable = (V[])new Object[keyTable.length];
+	}
+
+	/** Creates a new map identical to the specified map. */
+	public LongMap (LongMap<? extends V> map) {
+		this(map.capacity, map.loadFactor);
+		stashSize = map.stashSize;
+		System.arraycopy(map.keyTable, 0, keyTable, 0, map.keyTable.length);
+		System.arraycopy(map.valueTable, 0, valueTable, 0, map.valueTable.length);
+		size = map.size;
+		zeroValue = map.zeroValue;
+		hasZeroValue = map.hasZeroValue;
 	}
 
 	public V put (long key, V value) {
@@ -411,6 +422,7 @@ public class LongMap<V> {
 	}
 
 	public void clear () {
+		if (size == 0) return;
 		long[] keyTable = this.keyTable;
 		V[] valueTable = this.valueTable;
 		for (int i = capacity + stashSize; i-- > 0;) {
@@ -487,7 +499,7 @@ public class LongMap<V> {
 		return notFound;
 	}
 
-	/** Increases the size of the backing array to acommodate the specified number of additional items. Useful before adding many
+	/** Increases the size of the backing array to accommodate the specified number of additional items. Useful before adding many
 	 * items to avoid multiple backing array resizes. */
 	public void ensureCapacity (int additionalCapacity) {
 		int sizeNeeded = size + additionalCapacity;
@@ -556,6 +568,10 @@ public class LongMap<V> {
 		}
 		buffer.append(']');
 		return buffer.toString();
+	}
+
+	public Iterator<Entry<V>> iterator () {
+		return entries();
 	}
 
 	/** Returns an iterator for the entries in the map. Remove is supported. Note that the same iterator instance is returned each
@@ -667,6 +683,8 @@ public class LongMap<V> {
 				throw new IllegalStateException("next must be called before remove.");
 			} else if (currentIndex >= map.capacity) {
 				map.removeStashIndex(currentIndex);
+				nextIndex = currentIndex - 1;
+				findNextIndex();
 			} else {
 				map.keyTable[currentIndex] = EMPTY;
 				map.valueTable[currentIndex] = null;
@@ -701,11 +719,16 @@ public class LongMap<V> {
 		}
 
 		public boolean hasNext () {
+			if (!valid) throw new GdxRuntimeException("#iterator() cannot be used nested.");
 			return hasNext;
 		}
 
 		public Iterator<Entry<V>> iterator () {
 			return this;
+		}
+
+		public void remove () {
+			super.remove();
 		}
 	}
 
@@ -715,6 +738,7 @@ public class LongMap<V> {
 		}
 
 		public boolean hasNext () {
+			if (!valid) throw new GdxRuntimeException("#iterator() cannot be used nested.");
 			return hasNext;
 		}
 
@@ -741,6 +765,10 @@ public class LongMap<V> {
 			while (hasNext)
 				array.add(next());
 			return array;
+		}
+
+		public void remove () {
+			super.remove();
 		}
 	}
 

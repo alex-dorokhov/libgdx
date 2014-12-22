@@ -1,12 +1,12 @@
 /*******************************************************************************
  * Copyright 2011 See AUTHORS file.
- * 
+ *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -39,7 +39,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.LifecycleListener;
 import com.badlogic.gdx.Net;
 import com.badlogic.gdx.Preferences;
-import com.badlogic.gdx.backends.openal.OpenALAudio;
+import com.badlogic.gdx.backends.lwjgl.audio.OpenALAudio;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Clipboard;
 import com.badlogic.gdx.utils.GdxRuntimeException;
@@ -63,13 +63,14 @@ public class LwjglAWTCanvas implements Application {
 	int lastWidth;
 	int lastHeight;
 	int logLevel = LOG_INFO;
+	final String logTag = "LwjglAWTCanvas";
 	private Cursor cursor;
 
-	public LwjglAWTCanvas (ApplicationListener listener, boolean useGL2) {
-		this(listener, useGL2, null);
+	public LwjglAWTCanvas (ApplicationListener listener) {
+		this(listener, null);
 	}
 
-	public LwjglAWTCanvas (ApplicationListener listener, boolean useGL2, LwjglAWTCanvas sharedContextCanvas) {
+	public LwjglAWTCanvas (ApplicationListener listener, LwjglAWTCanvas sharedContextCanvas) {
 		LwjglNativesLoader.load();
 
 		AWTGLCanvas sharedDrawable = sharedContextCanvas != null ? sharedContextCanvas.canvas : null;
@@ -78,6 +79,7 @@ public class LwjglAWTCanvas implements Application {
 				sharedDrawable) {
 				private final Dimension minSize = new Dimension(0, 0);
 
+				@Override
 				public Dimension getMinimumSize () {
 					return minSize;
 				}
@@ -102,18 +104,21 @@ public class LwjglAWTCanvas implements Application {
 			throw new GdxRuntimeException(ex);
 		}
 
-		graphics = new LwjglGraphics(canvas, useGL2) {
+		graphics = new LwjglGraphics(canvas) {
+			@Override
 			public void setTitle (String title) {
 				super.setTitle(title);
 				LwjglAWTCanvas.this.setTitle(title);
 			}
 
+			@Override
 			public boolean setDisplayMode (int width, int height, boolean fullscreen) {
 				if (!super.setDisplayMode(width, height, fullscreen)) return false;
 				if (!fullscreen) LwjglAWTCanvas.this.setDisplayMode(width, height);
 				return true;
 			}
 
+			@Override
 			public boolean setDisplayMode (DisplayMode displayMode) {
 				if (!super.setDisplayMode(displayMode)) return false;
 				LwjglAWTCanvas.this.setDisplayMode(displayMode.width, displayMode.height);
@@ -220,7 +225,7 @@ public class LwjglAWTCanvas implements Application {
 
 	void render () {
 		if (!running) return;
-		
+
 		setGlobals();
 		canvas.setCursor(cursor);
 		graphics.updateTime();
@@ -251,6 +256,7 @@ public class LwjglAWTCanvas implements Application {
 
 		input.processEvents();
 		if (running) {
+			graphics.frameId++;
 			listener.render();
 			if (audio != null) {
 				audio.update();
@@ -275,6 +281,14 @@ public class LwjglAWTCanvas implements Application {
 		running = false;
 		setGlobals();
 		Array<LifecycleListener> listeners = lifecycleListeners;
+
+		// To allow destroying of OpenGL textures during disposal.
+		if (canvas.isDisplayable()) {
+			makeCurrent();
+		} else {
+			error(logTag, "OpenGL context destroyed before application listener has had a chance to dispose of textures.");
+		}
+
 		synchronized (listeners) {
 			for (LifecycleListener listener : listeners) {
 				listener.pause();
@@ -285,9 +299,9 @@ public class LwjglAWTCanvas implements Application {
 		listener.dispose();
 
 		Gdx.app = null;
-		
+
 		Gdx.graphics = null;
-		
+
 		if (audio != null) {
 			audio.dispose();
 			Gdx.audio = null;
@@ -296,7 +310,7 @@ public class LwjglAWTCanvas implements Application {
 		if (files != null) Gdx.files = null;
 
 		if (net != null) Gdx.net = null;
-		
+
 		stopped();
 	}
 
@@ -317,7 +331,7 @@ public class LwjglAWTCanvas implements Application {
 		if (preferences.containsKey(name)) {
 			return preferences.get(name);
 		} else {
-			Preferences prefs = new LwjglPreferences(name);
+			Preferences prefs = new LwjglPreferences(name, ".prefs/");
 			preferences.put(name, prefs);
 			return prefs;
 		}
@@ -350,6 +364,7 @@ public class LwjglAWTCanvas implements Application {
 		}
 	}
 
+	@Override
 	public void log (String tag, String message) {
 		if (logLevel >= LOG_INFO) {
 			System.out.println(tag + ": " + message);

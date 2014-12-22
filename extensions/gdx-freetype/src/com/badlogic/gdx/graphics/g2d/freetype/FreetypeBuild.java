@@ -107,13 +107,20 @@ public class FreetypeBuild {
 		mac.cFlags += " -DFT2_BUILD_LIBRARY";
 		mac.cppFlags += " -DFT2_BUILD_LIBRARY";
 		mac.linkerFlags += " -framework CoreServices -framework Carbon";
+		
+		BuildTarget mac64 = BuildTarget.newDefaultTarget(TargetOs.MacOsX, true);
+		mac64.headerDirs = headers;
+		mac64.cIncludes = sources;
+		mac64.cFlags += " -DFT2_BUILD_LIBRARY";
+		mac64.cppFlags += " -DFT2_BUILD_LIBRARY";
+		mac64.linkerFlags += " -framework CoreServices -framework Carbon";
 
 		BuildTarget android = BuildTarget.newDefaultTarget(TargetOs.Android, false);
 		android.headerDirs = headers;
 		android.cIncludes = sources;
 		android.cFlags += " -std=c99 -DFT2_BUILD_LIBRARY";
 		android.cppFlags += " -std=c99 -DFT2_BUILD_LIBRARY";
-		
+
 		BuildTarget ios = BuildTarget.newDefaultTarget(TargetOs.IOS, false);
 		ios.headerDirs = headers;
 		ios.cIncludes = sources;
@@ -121,9 +128,10 @@ public class FreetypeBuild {
 		ios.cppFlags += " -DFT2_BUILD_LIBRARY";
 
 		new NativeCodeGenerator().generate();
-		new AntScriptGenerator().generate(new BuildConfig("gdx-freetype"), win32home, win32, win64, lin32, lin64, mac, android, ios);
+		new AntScriptGenerator()
+			.generate(new BuildConfig("gdx-freetype"), win32home, win32, win64, lin32, lin64, mac, mac64, android, ios);
 // BuildExecutor.executeAnt("jni/build-windows32home.xml", "-v clean");
 // BuildExecutor.executeAnt("jni/build-windows32home.xml", "-v");
-//		BuildExecutor.executeAnt("jni/build.xml", "pack-natives -v");
+// BuildExecutor.executeAnt("jni/build.xml", "pack-natives -v");
 	}
 }

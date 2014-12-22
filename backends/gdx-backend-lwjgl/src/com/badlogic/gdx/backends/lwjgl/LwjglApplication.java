@@ -17,8 +17,6 @@
 package com.badlogic.gdx.backends.lwjgl;
 
 import java.awt.Canvas;
-import java.util.HashMap;
-import java.util.Map;
 
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.Display;
@@ -32,10 +30,11 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.LifecycleListener;
 import com.badlogic.gdx.Net;
 import com.badlogic.gdx.Preferences;
-import com.badlogic.gdx.backends.openal.OpenALAudio;
+import com.badlogic.gdx.backends.lwjgl.audio.OpenALAudio;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.Clipboard;
 import com.badlogic.gdx.utils.GdxRuntimeException;
+import com.badlogic.gdx.utils.ObjectMap;
 
 /** An OpenGL surface fullscreen or in a lightweight window. */
 public class LwjglApplication implements Application {
@@ -47,25 +46,26 @@ public class LwjglApplication implements Application {
 	protected final ApplicationListener listener;
 	protected Thread mainLoopThread;
 	protected boolean running = true;
-	protected final Array<Runnable> runnables = new Array();
-	protected final Array<Runnable> executedRunnables = new Array();
+	protected final Array<Runnable> runnables = new Array<Runnable>();
+	protected final Array<Runnable> executedRunnables = new Array<Runnable>();
 	protected final Array<LifecycleListener> lifecycleListeners = new Array<LifecycleListener>();
 	protected int logLevel = LOG_INFO;
+	protected String preferencesdir;
 
-	public LwjglApplication (ApplicationListener listener, String title, int width, int height, boolean useGL2) {
-		this(listener, createConfig(title, width, height, useGL2));
+	public LwjglApplication (ApplicationListener listener, String title, int width, int height) {
+		this(listener, createConfig(title, width, height));
 	}
 
 	public LwjglApplication (ApplicationListener listener) {
-		this(listener, null, 640, 480, false);
+		this(listener, null, 640, 480);
 	}
 
 	public LwjglApplication (ApplicationListener listener, LwjglApplicationConfiguration config) {
 		this(listener, config, new LwjglGraphics(config));
 	}
 
-	public LwjglApplication (ApplicationListener listener, boolean useGL2, Canvas canvas) {
-		this(listener, new LwjglApplicationConfiguration(), new LwjglGraphics(canvas, useGL2));
+	public LwjglApplication (ApplicationListener listener, Canvas canvas) {
+		this(listener, new LwjglApplicationConfiguration(), new LwjglGraphics(canvas));
 	}
 
 	public LwjglApplication (ApplicationListener listener, LwjglApplicationConfiguration config, Canvas canvas) {
@@ -73,7 +73,7 @@ public class LwjglApplication implements Application {
 	}
 
 	public LwjglApplication (ApplicationListener listener, LwjglApplicationConfiguration config, LwjglGraphics graphics) {
-		LwjglNativesLoader.load();
+		LwjglNativesLoader.load();		
 
 		if (config.title == null) config.title = listener.getClass().getSimpleName();
 
@@ -85,6 +85,7 @@ public class LwjglApplication implements Application {
 		input = new LwjglInput();
 		net = new LwjglNet();
 		this.listener = listener;
+		this.preferencesdir = config.preferencesDirectory;
 
 		Gdx.app = this;
 		Gdx.graphics = graphics;
@@ -95,12 +96,11 @@ public class LwjglApplication implements Application {
 		initialize();
 	}
 
-	private static LwjglApplicationConfiguration createConfig (String title, int width, int height, boolean useGL2) {
+	private static LwjglApplicationConfiguration createConfig (String title, int width, int height) {
 		LwjglApplicationConfiguration config = new LwjglApplicationConfiguration();
 		config.title = title;
 		config.width = width;
 		config.height = height;
-		config.useGL20 = useGL2;
 		config.vSyncEnabled = true;
 		return config;
 	}
@@ -134,8 +134,7 @@ public class LwjglApplication implements Application {
 		}
 
 		listener.create();
-		listener.resize(graphics.getWidth(), graphics.getHeight());
-		graphics.resize = false;
+		graphics.resize = true;
 
 		int lastWidth = graphics.getWidth();
 		int lastHeight = graphics.getHeight();
@@ -157,11 +156,11 @@ public class LwjglApplication implements Application {
 			}
 			if (!wasActive && isActive) { // if it's just recently focused from minimized state
 				wasActive = true;
-				listener.resume();
 				synchronized (lifecycleListeners) {
 					for (LifecycleListener listener : lifecycleListeners)
 						listener.resume();
 				}
+				listener.resume();				
 			}
 
 			boolean shouldRender = false;
@@ -204,6 +203,7 @@ public class LwjglApplication implements Application {
 			int frameRate = isActive ? graphics.config.foregroundFPS : graphics.config.backgroundFPS;
 			if (shouldRender) {
 				graphics.updateTime();
+				graphics.frameId++;
 				listener.render();
 				Display.update(false);
 			} else {
@@ -230,13 +230,13 @@ public class LwjglApplication implements Application {
 
 	public boolean executeRunnables () {
 		synchronized (runnables) {
-			executedRunnables.addAll(runnables);
+			for (int i = runnables.size - 1; i >= 0; i--)
+				executedRunnables.addAll(runnables.get(i));
 			runnables.clear();
 		}
 		if (executedRunnables.size == 0) return false;
-		for (int i = 0; i < executedRunnables.size; i++)
-			executedRunnables.get(i).run();
-		executedRunnables.clear();
+		for (int i = executedRunnables.size - 1; i >= 0; i--)
+			executedRunnables.removeIndex(i).run();
 		return true;
 	}
 
@@ -298,14 +298,14 @@ public class LwjglApplication implements Application {
 		return getJavaHeap();
 	}
 
-	Map<String, Preferences> preferences = new HashMap<String, Preferences>();
+	ObjectMap<String, Preferences> preferences = new ObjectMap<String, Preferences>();
 
 	@Override
 	public Preferences getPreferences (String name) {
 		if (preferences.containsKey(name)) {
 			return preferences.get(name);
 		} else {
-			Preferences prefs = new LwjglPreferences(name);
+			Preferences prefs = new LwjglPreferences(name, this.preferencesdir);
 			preferences.put(name, prefs);
 			return prefs;
 		}
@@ -375,7 +375,7 @@ public class LwjglApplication implements Application {
 	}
 
 	@Override
-	public int getLogLevel() {
+	public int getLogLevel () {
 		return logLevel;
 	}
 

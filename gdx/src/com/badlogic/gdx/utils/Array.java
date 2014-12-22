@@ -16,12 +16,12 @@
 
 package com.badlogic.gdx.utils;
 
-import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.utils.reflect.ArrayReflection;
-
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
+
+import com.badlogic.gdx.math.MathUtils;
+import com.badlogic.gdx.utils.reflect.ArrayReflection;
 
 /** A resizable, ordered or unordered array of objects. If unordered, this class avoids a memory copy when removing elements (the
  * last element is moved to the removed element's position).
@@ -92,7 +92,7 @@ public class Array<T> implements Iterable<T> {
 	public Array (boolean ordered, T[] array, int start, int count) {
 		this(ordered, count, (Class)array.getClass().getComponentType());
 		size = count;
-		System.arraycopy(array, 0, items, 0, size);
+		System.arraycopy(array, start, items, 0, size);
 	}
 
 	public void add (T value) {
@@ -105,22 +105,22 @@ public class Array<T> implements Iterable<T> {
 		addAll(array, 0, array.size);
 	}
 
-	public void addAll (Array<? extends T> array, int offset, int length) {
-		if (offset + length > array.size)
-			throw new IllegalArgumentException("offset + length must be <= size: " + offset + " + " + length + " <= " + array.size);
-		addAll((T[])array.items, offset, length);
+	public void addAll (Array<? extends T> array, int start, int count) {
+		if (start + count > array.size)
+			throw new IllegalArgumentException("start + count must be <= size: " + start + " + " + count + " <= " + array.size);
+		addAll((T[])array.items, start, count);
 	}
 
 	public void addAll (T... array) {
 		addAll(array, 0, array.length);
 	}
 
-	public void addAll (T[] array, int offset, int length) {
+	public void addAll (T[] array, int start, int count) {
 		T[] items = this.items;
-		int sizeNeeded = size + length;
+		int sizeNeeded = size + count;
 		if (sizeNeeded > items.length) items = resize(Math.max(8, (int)(sizeNeeded * 1.75f)));
-		System.arraycopy(array, offset, items, size, length);
-		size += length;
+		System.arraycopy(array, start, items, size, count);
+		size += count;
 	}
 
 	public T get (int index) {
@@ -201,7 +201,7 @@ public class Array<T> implements Iterable<T> {
 		return -1;
 	}
 
-	/** Removes value from an array if it exists.
+	/** Removes the first instance of the specified value in the array.
 	 * @param identity If true, == comparison will be used. If false, .equals() comparison will be used.
 	 * @return true if value was found and removed, false otherwise */
 	public boolean removeValue (T value, boolean identity) {
@@ -236,6 +236,22 @@ public class Array<T> implements Iterable<T> {
 			items[index] = items[size];
 		items[size] = null;
 		return value;
+	}
+
+	/** Removes the items between the specified indices, inclusive. */
+	public void removeRange (int start, int end) {
+		if (end >= size) throw new IndexOutOfBoundsException("end can't be >= size: " + end + " >= " + size);
+		if (start > end) throw new IndexOutOfBoundsException("start can't be > end: " + start + " > " + end);
+		T[] items = this.items;
+		int count = end - start + 1;
+		if (ordered)
+			System.arraycopy(items, start + count, items, start, size - (start + count));
+		else {
+			int lastIndex = this.size - 1;
+			for (int i = 0; i < count; i++)
+				items[start + i] = items[lastIndex - i];
+		}
+		size -= count;
 	}
 
 	/** Removes from this array all of elements contained in the specified array.
@@ -300,13 +316,14 @@ public class Array<T> implements Iterable<T> {
 	}
 
 	/** Reduces the size of the backing array to the size of the actual items. This is useful to release memory when many items have
-	 * been removed, or if it is known that more items will not be added. */
-	public void shrink () {
-		if (items.length == size) return;
-		resize(size);
+	 * been removed, or if it is known that more items will not be added.
+	 * @return {@link #items} */
+	public T[] shrink () {
+		if (items.length != size) resize(size);
+		return items;
 	}
 
-	/** Increases the size of the backing array to acommodate the specified number of additional items. Useful before adding many
+	/** Increases the size of the backing array to accommodate the specified number of additional items. Useful before adding many
 	 * items to avoid multiple backing array resizes.
 	 * @return {@link #items} */
 	public T[] ensureCapacity (int additionalCapacity) {
@@ -331,11 +348,12 @@ public class Array<T> implements Iterable<T> {
 	}
 
 	/** Sorts the array. This method is not thread safe (uses {@link Sort#instance()}). */
-	public void sort (Comparator<T> comparator) {
+	public void sort (Comparator<? super T> comparator) {
 		Sort.instance().sort(items, comparator, 0, size);
 	}
 
-	/** Selects the nth-lowest element from the Array according to Comparator ranking. This might partially sort the Array.
+	/** Selects the nth-lowest element from the Array according to Comparator ranking. This might partially sort the Array. The
+	 * array must have a size greater than 0, or a {@link com.badlogic.gdx.utils.GdxRuntimeException} will be thrown.
 	 * @see Select
 	 * @param comparator used for comparison
 	 * @param kthLowest rank of desired object according to comparison, n is based on ordinal numbers, not array indices. for min
@@ -467,11 +485,28 @@ public class Array<T> implements Iterable<T> {
 		return buffer.toString();
 	}
 
+	/** @see #Array(Class) */
+	static public <T> Array<T> of (Class<T> arrayType) {
+		return new Array<T>(arrayType);
+	}
+
+	/** @see #Array(boolean, int, Class) */
+	static public <T> Array<T> of (boolean ordered, int capacity, Class<T> arrayType) {
+		return new Array<T>(ordered, capacity, arrayType);
+	}
+
+	/** @see #Array(Object[]) */
+	static public <T> Array<T> with (T... array) {
+		return new Array(array);
+	}
+
 	static public class ArrayIterator<T> implements Iterator<T>, Iterable<T> {
 		private final Array<T> array;
 		private final boolean allowRemove;
 		int index;
 		boolean valid = true;
+
+// ArrayIterable<T> iterable;
 
 		public ArrayIterator (Array<T> array) {
 			this(array, true);
@@ -483,12 +518,19 @@ public class Array<T> implements Iterable<T> {
 		}
 
 		public boolean hasNext () {
+			if (!valid) {
+// System.out.println(iterable.lastAcquire);
+				throw new GdxRuntimeException("#iterator() cannot be used nested.");
+			}
 			return index < array.size;
 		}
 
 		public T next () {
 			if (index >= array.size) throw new NoSuchElementException(String.valueOf(index));
-			if (!valid) throw new GdxRuntimeException("#iterator() cannot be used nested.");
+			if (!valid) {
+// System.out.println(iterable.lastAcquire);
+				throw new GdxRuntimeException("#iterator() cannot be used nested.");
+			}
 			return array.items[index++];
 		}
 
@@ -512,6 +554,8 @@ public class Array<T> implements Iterable<T> {
 		private final boolean allowRemove;
 		private ArrayIterator iterator1, iterator2;
 
+//		java.io.StringWriter lastAcquire = new java.io.StringWriter();
+
 		public ArrayIterable (Array<T> array) {
 			this(array, true);
 		}
@@ -522,9 +566,13 @@ public class Array<T> implements Iterable<T> {
 		}
 
 		public Iterator<T> iterator () {
+// lastAcquire.getBuffer().setLength(0);
+// new Throwable().printStackTrace(new java.io.PrintWriter(lastAcquire));
 			if (iterator1 == null) {
 				iterator1 = new ArrayIterator(array, allowRemove);
 				iterator2 = new ArrayIterator(array, allowRemove);
+//				iterator1.iterable = this;
+//				iterator2.iterable = this;
 			}
 			if (!iterator1.valid) {
 				iterator1.index = 0;

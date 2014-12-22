@@ -16,9 +16,6 @@
 
 package com.badlogic.gdx.graphics;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.assets.AssetLoaderParameters.LoadedCallback;
@@ -27,43 +24,37 @@ import com.badlogic.gdx.assets.loaders.AssetLoader;
 import com.badlogic.gdx.assets.loaders.TextureLoader.TextureParameter;
 import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Pixmap.Format;
+import com.badlogic.gdx.graphics.glutils.ETC1TextureData;
+import com.badlogic.gdx.graphics.glutils.FileTextureData;
+import com.badlogic.gdx.graphics.glutils.KTXTextureData;
 import com.badlogic.gdx.graphics.glutils.PixmapTextureData;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.Disposable;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 
-/** <p>
- * A Texture wraps a standard OpenGL ES texture.
- * </p>
- * 
+import java.util.HashMap;
+import java.util.Map;
+
+/** A Texture wraps a standard OpenGL ES texture.
  * <p>
  * A Texture can be managed. If the OpenGL context is lost all managed textures get invalidated. This happens when a user switches
  * to another application or receives an incoming call. Managed textures get reloaded automatically.
- * </p>
- * 
  * <p>
  * A Texture has to be bound via the {@link Texture#bind()} method in order for it to be applied to geometry. The texture will be
- * bound to the currently active texture unit specified via {@link GLCommon#glActiveTexture(int)}.
- * </p>
- * 
+ * bound to the currently active texture unit specified via {@link GL20#glActiveTexture(int)}.
  * <p>
  * You can draw {@link Pixmap}s to a texture at any time. The changes will be automatically uploaded to texture memory. This is of
  * course not extremely fast so use it with care. It also only works with unmanaged textures.
- * </p>
- * 
  * <p>
  * A Texture must be disposed when it is no longer used
- * </p>
- * 
  * @author badlogicgames@gmail.com */
 public class Texture extends GLTexture {
 	private static AssetManager assetManager;
 	final static Map<Application, Array<Texture>> managedTextures = new HashMap<Application, Array<Texture>>();
-	
+
 	public enum TextureFilter {
-		Nearest(GL10.GL_NEAREST), Linear(GL10.GL_LINEAR), MipMap(GL10.GL_LINEAR_MIPMAP_LINEAR), MipMapNearestNearest(
-			GL10.GL_NEAREST_MIPMAP_NEAREST), MipMapLinearNearest(GL10.GL_LINEAR_MIPMAP_NEAREST), MipMapNearestLinear(
-			GL10.GL_NEAREST_MIPMAP_LINEAR), MipMapLinearLinear(GL10.GL_LINEAR_MIPMAP_LINEAR);
+		Nearest(GL20.GL_NEAREST), Linear(GL20.GL_LINEAR), MipMap(GL20.GL_LINEAR_MIPMAP_LINEAR), MipMapNearestNearest(
+			GL20.GL_NEAREST_MIPMAP_NEAREST), MipMapLinearNearest(GL20.GL_LINEAR_MIPMAP_NEAREST), MipMapNearestLinear(
+			GL20.GL_NEAREST_MIPMAP_LINEAR), MipMapLinearLinear(GL20.GL_LINEAR_MIPMAP_LINEAR);
 
 		final int glEnum;
 
@@ -72,7 +63,7 @@ public class Texture extends GLTexture {
 		}
 
 		public boolean isMipMap () {
-			return glEnum != GL10.GL_NEAREST && glEnum != GL10.GL_LINEAR;
+			return glEnum != GL20.GL_NEAREST && glEnum != GL20.GL_LINEAR;
 		}
 
 		public int getGLEnum () {
@@ -81,7 +72,7 @@ public class Texture extends GLTexture {
 	}
 
 	public enum TextureWrap {
-		MirroredRepeat(GL20.GL_MIRRORED_REPEAT),ClampToEdge(GL10.GL_CLAMP_TO_EDGE), Repeat(GL10.GL_REPEAT);
+		MirroredRepeat(GL20.GL_MIRRORED_REPEAT), ClampToEdge(GL20.GL_CLAMP_TO_EDGE), Repeat(GL20.GL_REPEAT);
 
 		final int glEnum;
 
@@ -95,7 +86,7 @@ public class Texture extends GLTexture {
 	}
 
 	TextureData data;
-	
+
 	public Texture (String internalPath) {
 		this(Gdx.files.internal(internalPath));
 	}
@@ -129,11 +120,11 @@ public class Texture extends GLTexture {
 	}
 
 	public Texture (TextureData data) {
-		super(GL10.GL_TEXTURE_2D, createGLHandle());
+		super(GL20.GL_TEXTURE_2D, createGLHandle());
 		load(data);
 		if (data.isManaged()) addManagedTexture(Gdx.app, this);
 	}
-
+	
 	public void load (TextureData data) {
 		if (this.data != null && data.isManaged() != this.data.isManaged())
 			throw new GdxRuntimeException("New data must have the same managed status as the old data");
@@ -142,7 +133,7 @@ public class Texture extends GLTexture {
 		if (!data.isPrepared()) data.prepare();
 
 		bind();
-		uploadImageData(GL10.GL_TEXTURE_2D, data);
+		uploadImageData(GL20.GL_TEXTURE_2D, data);
 
 		setFilter(minFilter, magFilter);
 		setWrap(uWrap, vWrap);
@@ -168,8 +159,8 @@ public class Texture extends GLTexture {
 		if (data.isManaged()) throw new GdxRuntimeException("can't draw to a managed texture");
 
 		bind();
-		Gdx.gl.glTexSubImage2D(glTarget, 0, x, y, pixmap.getWidth(), pixmap.getHeight(), pixmap.getGLFormat(),
-			pixmap.getGLType(), pixmap.getPixels());
+		Gdx.gl.glTexSubImage2D(glTarget, 0, x, y, pixmap.getWidth(), pixmap.getHeight(), pixmap.getGLFormat(), pixmap.getGLType(),
+			pixmap.getPixels());
 	}
 
 	@Override
@@ -181,9 +172,9 @@ public class Texture extends GLTexture {
 	public int getHeight () {
 		return data.getHeight();
 	}
-	
+
 	@Override
-	public int getDepth() {
+	public int getDepth () {
 		return 0;
 	}
 
@@ -204,8 +195,7 @@ public class Texture extends GLTexture {
 		// removal from the asset manager.
 		if (glHandle == 0) return;
 		delete();
-		if (data.isManaged())
-			if (managedTextures.get(Gdx.app) != null) managedTextures.get(Gdx.app).removeValue(this, true);
+		if (data.isManaged()) if (managedTextures.get(Gdx.app) != null) managedTextures.get(Gdx.app).removeValue(this, true);
 	}
 
 	private static void addManagedTexture (Application app, Texture texture) {

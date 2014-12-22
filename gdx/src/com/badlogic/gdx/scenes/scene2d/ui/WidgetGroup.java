@@ -70,7 +70,7 @@ public class WidgetGroup extends Group implements Layout {
 	}
 
 	private void setLayoutEnabled (Group parent, boolean enabled) {
-		SnapshotArray<Actor> children = getChildren();
+		SnapshotArray<Actor> children = parent.getChildren();
 		for (int i = 0, n = children.size; i < n; i++) {
 			Actor actor = children.get(i);
 			if (actor instanceof Layout)
@@ -130,14 +130,14 @@ public class WidgetGroup extends Group implements Layout {
 	}
 
 	public void pack () {
-		float newWidth = getPrefWidth();
-		float newHeight = getPrefHeight();
-		if (newWidth != getWidth() || newHeight != getHeight()) {
-			setWidth(newWidth);
-			setHeight(newHeight);
-			invalidate();
-		}
+		setSize(getPrefWidth(), getPrefHeight());
 		validate();
+		// Some situations require another layout. Eg, a wrapped label doesn't know its pref height until it knows its width, so it
+		// calls invalidateHierarchy() in layout() if its pref height has changed.
+		if (needsLayout) {
+			setSize(getPrefWidth(), getPrefHeight());
+			validate();
+		}
 	}
 
 	public void setFillParent (boolean fillParent) {

@@ -16,7 +16,7 @@
 
 package com.badlogic.gdx.graphics.g3d.decals;
 
-import com.badlogic.gdx.graphics.GL10;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.Mesh;
 import com.badlogic.gdx.graphics.VertexAttribute;
 import com.badlogic.gdx.graphics.VertexAttributes;
@@ -61,11 +61,11 @@ public class DecalBatch implements Disposable {
 	};
 	private final Array<Array<Decal>> usedGroups = new Array<Array<Decal>>(16);
 
-	/** Creates a new batch using the {@link DefaultGroupStrategy} */
-	public DecalBatch () {
-		this(DEFAULT_SIZE, new DefaultGroupStrategy());
-	}
-
+	/**
+	 * Creates a new DecalBatch using the given {@link GroupStrategy}. The most
+	 * commong strategy to use is a {@link CameraGroupStrategy}
+	 * @param groupStrategy
+	 */
 	public DecalBatch (GroupStrategy groupStrategy) {
 		this(DEFAULT_SIZE, groupStrategy);
 	}
@@ -178,11 +178,7 @@ public class DecalBatch implements Disposable {
 	 * @param verticesPosition Amount of elements from the vertices array to flush */
 	protected void flush (ShaderProgram shader, int verticesPosition) {
 		mesh.setVertices(vertices, 0, verticesPosition);
-		if (shader != null) {
-			mesh.render(shader, GL10.GL_TRIANGLES, 0, verticesPosition / 4);
-		} else {
-			mesh.render(GL10.GL_TRIANGLES, 0, verticesPosition / 4);
-		}
+		mesh.render(shader, GL20.GL_TRIANGLES, 0, verticesPosition / 4);
 	}
 
 	/** Remove all decals from batch */

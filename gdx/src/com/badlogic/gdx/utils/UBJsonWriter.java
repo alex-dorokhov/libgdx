@@ -324,7 +324,18 @@ public class UBJsonWriter implements Closeable {
 		out.writeByte('#');
 		value(values.length);
 		for (int i = 0, n = values.length; i < n; i++) {
-			value(values[i]);
+			byte[] bytes = values[i].getBytes("UTF-8");
+			if (bytes.length <= Byte.MAX_VALUE) {
+				out.writeByte('i');
+				out.writeByte(bytes.length);
+			} else if (bytes.length <= Short.MAX_VALUE) {
+				out.writeByte('I');
+				out.writeShort(bytes.length);
+			} else {
+				out.writeByte('l');
+				out.writeInt(bytes.length);
+			}
+			out.write(bytes);
 		}
 		pop(true);
 		return this;
@@ -395,6 +406,12 @@ public class UBJsonWriter implements Closeable {
 	/** Appends a named {@code double} value to the stream.
 	 * @return this writer, for chaining */
 	public UBJsonWriter set (String name, double value) throws IOException {
+		return name(name).value(value);
+	}
+
+	/** Appends a named {@code boolean} value to the stream.
+	 * @return this writer, for chaining */
+	public UBJsonWriter set (String name, boolean value) throws IOException {
 		return name(name).value(value);
 	}
 
@@ -484,7 +501,7 @@ public class UBJsonWriter implements Closeable {
 	public UBJsonWriter pop () throws IOException {
 		return pop(false);
 	}
-	
+
 	protected UBJsonWriter pop (boolean silent) throws IOException {
 		if (named) throw new IllegalStateException("Expected an object, array, or value since a name was set.");
 		if (silent)

@@ -32,7 +32,7 @@ import com.badlogic.gdx.scenes.scene2d.utils.Drawable;
 
 /** A table that can be dragged and act as a modal window. The top padding is used as the window's title height.
  * <p>
- * The preferred size of a window is the preferred size of the title text and the children as layed out by the table. After adding
+ * The preferred size of a window is the preferred size of the title text and the children as laid out by the table. After adding
  * children to the window, it can be convenient to call {@link #pack()} to size the window to the size of the children.
  * @author Nathan Sweet */
 public class Window extends Table {
@@ -212,33 +212,38 @@ public class Window extends Table {
 	}
 
 	public void draw (Batch batch, float parentAlpha) {
+		Stage stage = getStage();
+		if (stage.getKeyboardFocus() == null) stage.setKeyboardFocus(this);
+
 		keepWithinStage();
+
+		if (style.stageBackground != null) {
+			stageToLocalCoordinates(tmpPosition.set(0, 0));
+			stageToLocalCoordinates(tmpSize.set(stage.getWidth(), stage.getHeight()));
+			drawStageBackground(batch, parentAlpha, getX() + tmpPosition.x, getY() + tmpPosition.y, getX() + tmpSize.x, getY()
+				+ tmpSize.y);
+		}
+
 		super.draw(batch, parentAlpha);
 	}
 
-	protected void drawBackground (Batch batch, float parentAlpha) {
-		float x = getX(), y = getY();
+	protected void drawStageBackground (Batch batch, float parentAlpha, float x, float y, float width, float height) {
+		Color color = getColor();
+		batch.setColor(color.r, color.g, color.b, color.a * parentAlpha);
+		style.stageBackground.draw(batch, x, y, width, height);
+	}
+
+	protected void drawBackground (Batch batch, float parentAlpha, float x, float y) {
 		float width = getWidth(), height = getHeight();
 		float padTop = getPadTop();
 
-		if (style.stageBackground != null) {
-			Color color = getColor();
-			batch.setColor(color.r, color.g, color.b, color.a * parentAlpha);
-			Stage stage = getStage();
-			stageToLocalCoordinates(/* in/out */tmpPosition.set(0, 0));
-			stageToLocalCoordinates(/* in/out */tmpSize.set(stage.getWidth(), stage.getHeight()));
-			style.stageBackground.draw(batch, x + tmpPosition.x, y + tmpPosition.y, x + tmpSize.x, y + tmpSize.y);
-		}
-
-		super.drawBackground(batch, parentAlpha);
+		super.drawBackground(batch, parentAlpha, x, y);
 
 		// Draw button table.
 		buttonTable.getColor().a = getColor().a;
 		buttonTable.pack();
 		buttonTable.setPosition(width - buttonTable.getWidth(), Math.min(height - padTop, height - buttonTable.getHeight()));
-		buttonTable.translate(x, y);
 		buttonTable.draw(batch, parentAlpha);
-		buttonTable.translate(-x, -y);
 
 		// Draw the title without the batch transformed or clipping applied.
 		y += height;
@@ -255,7 +260,7 @@ public class Window extends Table {
 			else
 				y -= (padTop - bounds.height) / 2;
 		}
-		titleCache.setColor(Color.tmp.set(getColor()).mul(style.titleFontColor));
+		titleCache.tint(Color.tmp.set(getColor()).mul(style.titleFontColor));
 		titleCache.setPosition((int)x, (int)y);
 		titleCache.draw(batch, parentAlpha);
 	}
@@ -263,6 +268,15 @@ public class Window extends Table {
 	public Actor hit (float x, float y, boolean touchable) {
 		Actor hit = super.hit(x, y, touchable);
 		if (hit == null && isModal && (!touchable || getTouchable() == Touchable.enabled)) return this;
+		float height = getHeight();
+		if (hit == null || hit == this) return hit;
+		if (y <= height && y >= height - getPadTop() && x >= 0 && x <= getWidth()) {
+			// Hit the title bar, don't use the hit child if it is in the Window's table.
+			Actor current = hit;
+			while (current.getParent() != this)
+				current = current.getParent();
+			if (getCell(current) != null) return this;
+		}
 		return hit;
 	}
 
@@ -316,8 +330,12 @@ public class Window extends Table {
 		return dragging;
 	}
 
+	public float getTitleWidth () {
+		return titleCache.getBounds().width;
+	}
+
 	public float getPrefWidth () {
-		return Math.max(super.getPrefWidth(), titleCache.getBounds().width + getPadLeft() + getPadRight());
+		return Math.max(super.getPrefWidth(), getTitleWidth() + getPadLeft() + getPadRight());
 	}
 
 	public Table getButtonTable () {

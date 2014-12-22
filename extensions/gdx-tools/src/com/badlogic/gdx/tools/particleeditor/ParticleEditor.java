@@ -49,12 +49,13 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.backends.lwjgl.LwjglCanvas;
 import com.badlogic.gdx.files.FileHandle;
-import com.badlogic.gdx.graphics.GL10;
+import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.ParticleEffect;
 import com.badlogic.gdx.graphics.g2d.ParticleEmitter;
+import com.badlogic.gdx.graphics.g2d.ParticleEmitter.GradientColorValue;
 import com.badlogic.gdx.graphics.g2d.ParticleEmitter.NumericValue;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -62,6 +63,10 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.GdxRuntimeException;
 
 public class ParticleEditor extends JFrame {
+	public static final String DEFAULT_PARTICLE = "particle.png"; 
+
+	public static final String DEFAULT_PREMULT_PARTICLE = "pre_particle.png";
+	
 	LwjglCanvas lwjglCanvas;
 	JPanel rowsPanel;
 	JPanel editRowsPanel;
@@ -72,6 +77,7 @@ public class ParticleEditor extends JFrame {
 	NumericValue pixelsPerMeter;
 	NumericValue zoomLevel;
 	NumericValue deltaMultiplier;
+	GradientColorValue backgroundColor;
 
 	float pixelsPerMeterPrev;
 	float zoomLevelPrev;
@@ -79,15 +85,11 @@ public class ParticleEditor extends JFrame {
 	ParticleEffect effect = new ParticleEffect();
     File effectFile;
 	final HashMap<ParticleEmitter, ParticleData> particleData = new HashMap();
-	
-	private Renderer renderer;
 
 	public ParticleEditor () {
 		super("Particle Editor");
 
-		this.renderer = new Renderer();
-		
-		lwjglCanvas = new LwjglCanvas(renderer, false);
+		lwjglCanvas = new LwjglCanvas(new Renderer());
 		addWindowListener(new WindowAdapter() {
 			public void windowClosed (WindowEvent event) {
 				System.exit(0);
@@ -112,6 +114,7 @@ public class ParticleEditor extends JFrame {
 				addEditorRow(new NumericPanel(zoomLevel, "Zoom level", ""));
 				addEditorRow(new BgImagePanel(ParticleEditor.this));
 				addEditorRow(new NumericPanel(deltaMultiplier, "Delta multiplier", ""));
+				addEditorRow(new GradientPanel(backgroundColor, "Background color", "", true));
 
 				rowsPanel.removeAll();
 				ParticleEmitter emitter = getEmitter();
@@ -141,7 +144,7 @@ public class ParticleEditor extends JFrame {
 				addRow(new ScaledNumericPanel(emitter.getRotation(), "Life", "Rotation", "Particle rotation, in degrees."));
 				addRow(new ScaledNumericPanel(emitter.getWind(), "Life", "Wind", "Wind strength, in world units per second."));
 				addRow(new ScaledNumericPanel(emitter.getGravity(), "Life", "Gravity", "Gravity strength, in world units per second."));
-				addRow(new GradientPanel(emitter.getTint(), "Tint", ""));
+				addRow(new GradientPanel(emitter.getTint(), "Tint", "", false));
 				addRow(new PercentagePanel(emitter.getTransparency(), "Life", "Transparency", ""));
 				addRow(new OptionsPanel(ParticleEditor.this, "Options", ""));
 				for (Component component : rowsPanel.getComponents())
@@ -321,8 +324,6 @@ public class ParticleEditor extends JFrame {
 		public void create () {
 			if (spriteBatch != null) return;
 
-			Texture.setEnforcePotImages(false);
-
 			spriteBatch = new SpriteBatch();
 
 			worldCamera = new OrthographicCamera();
@@ -339,6 +340,9 @@ public class ParticleEditor extends JFrame {
 			deltaMultiplier = new NumericValue();
 			deltaMultiplier.setValue(1.0f);
 			deltaMultiplier.setAlwaysActive(true);
+
+			backgroundColor = new GradientColorValue();
+			backgroundColor.setColors(new float[] { 0f, 0f, 0f});
 
 			font = new BitmapFont(Gdx.files.getFileHandle("default.fnt", FileType.Internal), Gdx.files.getFileHandle("default.png",
 				FileType.Internal), true);
@@ -369,7 +373,9 @@ public class ParticleEditor extends JFrame {
 
 			float delta = Math.max(0, Gdx.graphics.getDeltaTime() * deltaMultiplier.getValue());
 
-			Gdx.gl.glClear(GL10.GL_COLOR_BUFFER_BIT);
+			float[] colors = backgroundColor.getColors();
+			Gdx.gl.glClearColor(colors[0], colors[1], colors[2], 1.0f);
+			Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
 			if ((pixelsPerMeter.getValue() != pixelsPerMeterPrev) || (zoomLevel.getValue() != zoomLevelPrev)) {
 				if (pixelsPerMeter.getValue() <= 0) {
@@ -388,7 +394,7 @@ public class ParticleEditor extends JFrame {
 
 			spriteBatch.begin();
 			spriteBatch.enableBlending();
-			spriteBatch.setBlendFunction(GL10.GL_SRC_ALPHA, GL10.GL_ONE_MINUS_SRC_ALPHA);
+			spriteBatch.setBlendFunction(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
 
 			if (bgImage != null) {
 				bgImage.setPosition(viewWidth / 2 - bgImage.getWidth() / 2, viewHeight / 2 - bgImage.getHeight() / 2);
@@ -439,7 +445,7 @@ public class ParticleEditor extends JFrame {
 			String imageName = new File(imagePath.replace('\\', '/')).getName();
 			try {
 				FileHandle file;
-				if (imagePath.equals("particle.png")) {
+				if (imagePath.equals(ParticleEditor.DEFAULT_PARTICLE) || imagePath.equals(ParticleEditor.DEFAULT_PREMULT_PARTICLE))
 					file = Gdx.files.classpath(imagePath);
                 } else {
                     if ((imagePath.contains("/") || imagePath.contains("\\")) && !imageName.contains("..")) {

@@ -77,6 +77,15 @@ public class IntSet {
 		keyTable = new int[capacity + stashCapacity];
 	}
 
+	/** Creates a new map identical to the specified map. */
+	public IntSet (IntSet map) {
+		this(map.capacity, map.loadFactor);
+		stashSize = map.stashSize;
+		System.arraycopy(map.keyTable, 0, keyTable, 0, map.keyTable.length);
+		size = map.size;
+		hasZeroValue = map.hasZeroValue;
+	}
+
 	/** Returns true if the key was not already in the set. */
 	public boolean add (int key) {
 		if (key == 0) {
@@ -128,7 +137,27 @@ public class IntSet {
 		return true;
 	}
 
-	public void putAll (IntSet set) {
+	public void addAll (IntArray array) {
+		addAll(array, 0, array.size);
+	}
+
+	public void addAll (IntArray array, int offset, int length) {
+		if (offset + length > array.size)
+			throw new IllegalArgumentException("offset + length must be <= size: " + offset + " + " + length + " <= " + array.size);
+		addAll(array.items, offset, length);
+	}
+
+	public void addAll (int... array) {
+		addAll(array, 0, array.length);
+	}
+
+	public void addAll (int[] array, int offset, int length) {
+		ensureCapacity(length);
+		for (int i = offset, n = i + length; i < n; i++)
+			add(array[i]);
+	}
+
+	public void addAll (IntSet set) {
 		ensureCapacity(set.size);
 		IntSetIterator iterator = set.iterator();
 		while (iterator.hasNext)
@@ -316,6 +345,7 @@ public class IntSet {
 	}
 
 	public void clear () {
+		if (size == 0) return;
 		int[] keyTable = this.keyTable;
 		for (int i = capacity + stashSize; i-- > 0;)
 			keyTable[i] = EMPTY;
@@ -344,7 +374,15 @@ public class IntSet {
 		return false;
 	}
 
-	/** Increases the size of the backing array to acommodate the specified number of additional items. Useful before adding many
+	public int first () {
+		if (hasZeroValue) return 0;
+		int[] keyTable = this.keyTable;
+		for (int i = 0, n = capacity + stashSize; i < n; i++)
+			if (keyTable[i] != EMPTY) return keyTable[i];
+		throw new IllegalStateException("IntSet is empty.");
+	}
+
+	/** Increases the size of the backing array to accommodate the specified number of additional items. Useful before adding many
 	 * items to avoid multiple backing array resizes. */
 	public void ensureCapacity (int additionalCapacity) {
 		int sizeNeeded = size + additionalCapacity;
@@ -431,13 +469,10 @@ public class IntSet {
 		return iterator2;
 	}
 
-	static public class Entry<V> {
-		public int key;
-		public V value;
-
-		public String toString () {
-			return key + "=" + value;
-		}
+	static public IntSet with (int... array) {
+		IntSet set = new IntSet();
+		set.addAll(array);
+		return set;
 	}
 
 	static public class IntSetIterator {
@@ -482,6 +517,8 @@ public class IntSet {
 				throw new IllegalStateException("next must be called before remove.");
 			} else if (currentIndex >= set.capacity) {
 				set.removeStashIndex(currentIndex);
+				nextIndex = currentIndex - 1;
+				findNextIndex();
 			} else {
 				set.keyTable[currentIndex] = EMPTY;
 			}

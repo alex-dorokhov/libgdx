@@ -16,9 +16,15 @@
 
 package com.badlogic.gdx.graphics.g2d;
 
+import java.io.IOException;
+import java.io.Writer;
+
+import com.badlogic.gdx.files.FileHandle;
 import com.badlogic.gdx.graphics.Pixmap;
 import com.badlogic.gdx.graphics.Pixmap.Blending;
 import com.badlogic.gdx.graphics.Pixmap.Format;
+import com.badlogic.gdx.graphics.PixmapIO;
+import com.badlogic.gdx.graphics.PixmapIO.PNG;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.Texture.TextureFilter;
 import com.badlogic.gdx.graphics.glutils.PixmapTextureData;
@@ -46,7 +52,7 @@ import com.badlogic.gdx.utils.OrderedMap;
  * PixmapPacker packer = new PixmapPacker(512, 512, Format.RGB565, 2, true);
  * packer.pack(&quot;First Pixmap&quot;, pixmap1);
  * packer.pack(&quot;Second Pixmap&quot;, pixmap2);
- * TextureAtlas altas = packer.generateTextureAtlas(TextureFilter.Nearest, TextureFilter.Nearest);
+ * TextureAtlas atlas = packer.generateTextureAtlas(TextureFilter.Nearest, TextureFilter.Nearest);
  * </pre>
  * 
  * Note that you should not dispose the packer in this usage pattern. Instead, dispose the TextureAtlas if no longer needed.
@@ -85,7 +91,7 @@ import com.badlogic.gdx.utils.OrderedMap;
  * packer.dispose();
  * </pre> */
 public class PixmapPacker implements Disposable {
-	
+
 	static final class Node {
 		public Node leftChild;
 		public Node rightChild;
@@ -109,10 +115,14 @@ public class PixmapPacker implements Disposable {
 		OrderedMap<String, Rectangle> rects;
 		Pixmap image;
 		Texture texture;
-		Array<String> addedRects = new Array<String>();
+		final Array<String> addedRects = new Array();
 
 		public Pixmap getPixmap () {
 			return image;
+		}
+		
+		public OrderedMap<String, Rectangle> getRects () {
+			return rects;
 		}
 	}
 
@@ -121,7 +131,7 @@ public class PixmapPacker implements Disposable {
 	final Format pageFormat;
 	final int padding;
 	final boolean duplicateBorder;
-	final Array<Page> pages = new Array<Page>();
+	final Array<Page> pages = new Array();
 	Page currPage;
 	boolean disposed;
 
@@ -162,7 +172,7 @@ public class PixmapPacker implements Disposable {
 		Rectangle rect = new Rectangle(0, 0, image.getWidth() + borderPixels, image.getHeight() + borderPixels);
 		if (rect.getWidth() > pageWidth || rect.getHeight() > pageHeight)
 			throw new GdxRuntimeException("page size for '" + name + "' to small");
-		
+
 		Node node = insert(currPage.root, rect);
 
 		if (node == null) {
@@ -190,16 +200,19 @@ public class PixmapPacker implements Disposable {
 			this.currPage.image.drawPixmap(image, 0, 0, 1, 1, (int)rect.x - 1, (int)rect.y - 1, 1, 1);
 			this.currPage.image.drawPixmap(image, imageWidth - 1, 0, 1, 1, (int)rect.x + (int)rect.width, (int)rect.y - 1, 1, 1);
 			this.currPage.image.drawPixmap(image, 0, imageHeight - 1, 1, 1, (int)rect.x - 1, (int)rect.y + (int)rect.height, 1, 1);
-			this.currPage.image.drawPixmap(image, imageWidth - 1, imageHeight - 1, 1, 1, (int)rect.x + (int)rect.width, (int)rect.y + (int)rect.height, 1, 1);
+			this.currPage.image.drawPixmap(image, imageWidth - 1, imageHeight - 1, 1, 1, (int)rect.x + (int)rect.width, (int)rect.y
+				+ (int)rect.height, 1, 1);
 			// Copy edge pixels into padding.
 			this.currPage.image.drawPixmap(image, 0, 0, imageWidth, 1, (int)rect.x, (int)rect.y - 1, (int)rect.width, 1);
-			this.currPage.image.drawPixmap(image, 0, imageHeight - 1, imageWidth, 1, (int)rect.x, (int)rect.y + (int)rect.height, (int)rect.width, 1);
+			this.currPage.image.drawPixmap(image, 0, imageHeight - 1, imageWidth, 1, (int)rect.x, (int)rect.y + (int)rect.height,
+				(int)rect.width, 1);
 			this.currPage.image.drawPixmap(image, 0, 0, 1, imageHeight, (int)rect.x - 1, (int)rect.y, 1, (int)rect.height);
-			this.currPage.image.drawPixmap(image, imageWidth - 1, 0, 1, imageHeight, (int)rect.x + (int)rect.width, (int)rect.y, 1, (int)rect.height);
+			this.currPage.image.drawPixmap(image, imageWidth - 1, 0, 1, imageHeight, (int)rect.x + (int)rect.width, (int)rect.y, 1,
+				(int)rect.height);
 		}
-		
+
 		Pixmap.setBlending(blending);
-		
+
 		currPage.addedRects.add(name);
 		return rect;
 	}
@@ -284,12 +297,12 @@ public class PixmapPacker implements Disposable {
 		}
 		return null;
 	}
-	
+
 	/** Returns the index of the page containing the given packed rectangle.
 	 * @param name the name of the image
 	 * @return the index of the page the image is stored in or -1 */
 	public synchronized int getPageIndex (String name) {
-		for (int i=0; i<pages.size; i++) {
+		for (int i = 0; i < pages.size; i++) {
 			Rectangle rect = pages.get(i).rects.get(name);
 			if (rect != null) return i;
 		}
@@ -315,7 +328,7 @@ public class PixmapPacker implements Disposable {
 		TextureAtlas atlas = new TextureAtlas();
 		for (Page page : pages) {
 			if (page.rects.size != 0) {
-				Texture texture = new Texture(new PixmapTextureData(page.image, page.image.getFormat(), useMipMaps, true)) {
+				Texture texture = new Texture(new PixmapTextureData(page.image, page.image.getFormat(), useMipMaps, false, true)) {
 					@Override
 					public void dispose () {
 						super.dispose();
@@ -343,7 +356,7 @@ public class PixmapPacker implements Disposable {
 		for (Page page : pages) {
 			if (page.texture == null) {
 				if (page.rects.size != 0 && page.addedRects.size > 0) {
-					page.texture = new Texture(new PixmapTextureData(page.image, page.image.getFormat(), useMipMaps, true)) {
+					page.texture = new Texture(new PixmapTextureData(page.image, page.image.getFormat(), useMipMaps, false, true)) {
 						@Override
 						public void dispose () {
 							super.dispose();

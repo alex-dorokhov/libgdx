@@ -24,6 +24,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
 import java.net.URI;
+import java.io.FileWriter;
+import java.io.Writer;
 
 import javax.swing.JButton;
 import javax.swing.JOptionPane;
@@ -42,6 +44,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.ParticleEffect;
 import com.badlogic.gdx.graphics.g2d.ParticleEmitter;
 import com.badlogic.gdx.utils.Array;
+import com.badlogic.gdx.utils.StreamUtils;
 
 class EffectPanel extends JPanel {
 	ParticleEditor editor;
@@ -67,7 +70,7 @@ class EffectPanel extends JPanel {
 		emitter.getTransparency().setHigh(1);
 
 		emitter.setMaxParticleCount(25);
-		emitter.setImagePath("particle.png");
+		emitter.setImagePath(ParticleEditor.DEFAULT_PARTICLE);
 
 		addEmitter(name, select, emitter);
 		return emitter;
@@ -75,45 +78,45 @@ class EffectPanel extends JPanel {
 
 	public ParticleEmitter newExampleEmitter (String name, boolean select) {
 		final ParticleEmitter emitter = new ParticleEmitter();
-		
+
 		emitter.getDuration().setLow(3000);
-		
+
 		emitter.getEmission().setHigh(250);
-		
+
 		emitter.getLife().setHigh(500, 1000);
 		emitter.getLife().setTimeline(new float[] {0, 0.66f, 1});
 		emitter.getLife().setScaling(new float[] {1, 1, 0.3f});
-		
+
 		emitter.getScale().setHigh(32, 32);
-		
+
 		emitter.getRotation().setLow(1, 360);
 		emitter.getRotation().setHigh(180, 180);
 		emitter.getRotation().setTimeline(new float[] {0, 1});
 		emitter.getRotation().setScaling(new float[] {0, 1});
 		emitter.getRotation().setRelative(true);
-		
+
 		emitter.getAngle().setHigh(45, 135);
 		emitter.getAngle().setLow(90);
 		emitter.getAngle().setTimeline(new float[] {0, 0.5f, 1});
 		emitter.getAngle().setScaling(new float[] {1, 0, 0});
 		emitter.getAngle().setActive(true);
-		
+
 		emitter.getVelocity().setHigh(30, 300);
 		emitter.getVelocity().setActive(true);
-		
+
 		emitter.getTint().setColors(new float[] {1, 0.12156863f, 0.047058824f});
-		
+
 		emitter.getTransparency().setHigh(1, 1);
 		emitter.getTransparency().setTimeline(new float[] {0, 0.2f, 0.8f, 1});
 		emitter.getTransparency().setScaling(new float[] {0, 1, 0.75f, 0});
-		
+
 		emitter.setMaxParticleCount(200);
-		emitter.setImagePath("particle.png");
-		
+		emitter.setImagePath(ParticleEditor.DEFAULT_PARTICLE);
+
 		addEmitter(name, select, emitter);
 		return emitter;
 	}
-	
+
 	private void addEmitter (String name, boolean select, final ParticleEmitter emitter) {
 		Array<ParticleEmitter> emitters = editor.effect.getEmitters();
 		if (emitters.size == 0)
@@ -202,8 +205,7 @@ class EffectPanel extends JPanel {
         }
 		lastDir = dir;
 		int index = 0;
-        File effectFile = new File(dir, file);
-
+        
         // save each image path as relative path to effect file directory
         URI effectDirUri = effectFile.getParentFile().toURI();
 		for (ParticleEmitter emitter : editor.effect.getEmitters()){
@@ -215,14 +217,31 @@ class EffectPanel extends JPanel {
                 emitter.setImagePath(effectDirUri.relativize(imageUri).getPath());
             }
 		}
+		
+		for (ParticleEmitter emitter : editor.effect.getEmitters())
+			emitter.setName((String)emitterTableModel.getValueAt(index++, 0));
 
+		File outputFile = new File(dir, file);
+		Writer fileWriter = null;
 		try {
-			editor.effect.save(effectFile);
+			fileWriter = new FileWriter(outputFile);
+			editor.effect.save(fileWriter);
 		} catch (Exception ex) {
-			System.out.println("Error saving effect: " + new File(dir, file).getAbsolutePath());
+			System.out.println("Error saving effect: " + outputFile.getAbsolutePath());
 			ex.printStackTrace();
 			JOptionPane.showMessageDialog(editor, "Error saving effect.");
+		} finally {
+			StreamUtils.closeQuietly(fileWriter);
 		}
+	}
+	
+	void duplicateEmitter() {
+		int row = emitterTable.getSelectedRow();
+		if (row == -1) return;
+		
+		String name = (String)emitterTableModel.getValueAt(row, 0);
+		
+		addEmitter(name, true, new ParticleEmitter(editor.effect.getEmitters().get(row)));
 	}
 
 	void deleteEmitter () {
@@ -271,6 +290,16 @@ class EffectPanel extends JPanel {
 				newButton.addActionListener(new ActionListener() {
 					public void actionPerformed (ActionEvent event) {
 						newEmitter("Untitled", true);
+					}
+				});
+			}
+			{
+				JButton newButton = new JButton("Duplicate");
+				sideButtons.add(newButton, new GridBagConstraints(0, -1, 1, 1, 0, 0, GridBagConstraints.CENTER,
+					GridBagConstraints.HORIZONTAL, new Insets(0, 0, 6, 0), 0, 0));
+				newButton.addActionListener(new ActionListener() {
+					public void actionPerformed (ActionEvent event) {
+						duplicateEmitter();
 					}
 				});
 			}
