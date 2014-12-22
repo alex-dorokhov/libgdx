@@ -66,7 +66,7 @@ public class ParticleEditor extends JFrame {
 	public static final String DEFAULT_PARTICLE = "particle.png"; 
 
 	public static final String DEFAULT_PREMULT_PARTICLE = "pre_particle.png";
-	
+
 	LwjglCanvas lwjglCanvas;
 	JPanel rowsPanel;
 	JPanel editRowsPanel;
@@ -85,11 +85,13 @@ public class ParticleEditor extends JFrame {
 	ParticleEffect effect = new ParticleEffect();
     File effectFile;
 	final HashMap<ParticleEmitter, ParticleData> particleData = new HashMap();
+	Renderer renderer;
 
 	public ParticleEditor () {
 		super("Particle Editor");
 
-		lwjglCanvas = new LwjglCanvas(new Renderer());
+		renderer = new Renderer();
+		lwjglCanvas = new LwjglCanvas(renderer);
 		addWindowListener(new WindowAdapter() {
 			public void windowClosed (WindowEvent event) {
 				System.exit(0);
@@ -445,7 +447,7 @@ public class ParticleEditor extends JFrame {
 			String imageName = new File(imagePath.replace('\\', '/')).getName();
 			try {
 				FileHandle file;
-				if (imagePath.equals(ParticleEditor.DEFAULT_PARTICLE) || imagePath.equals(ParticleEditor.DEFAULT_PREMULT_PARTICLE))
+				if (imagePath.equals(ParticleEditor.DEFAULT_PARTICLE) || imagePath.equals(ParticleEditor.DEFAULT_PREMULT_PARTICLE)) {
 					file = Gdx.files.classpath(imagePath);
                 } else {
                     if ((imagePath.contains("/") || imagePath.contains("\\")) && !imageName.contains("..")) {

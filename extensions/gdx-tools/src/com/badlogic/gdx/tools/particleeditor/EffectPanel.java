@@ -205,9 +205,11 @@ class EffectPanel extends JPanel {
         }
 		lastDir = dir;
 		int index = 0;
-        
+
+		File outputFile = new File(dir, file);
+
         // save each image path as relative path to effect file directory
-        URI effectDirUri = effectFile.getParentFile().toURI();
+        URI effectDirUri = outputFile.getParentFile().toURI();
 		for (ParticleEmitter emitter : editor.effect.getEmitters()){
 			emitter.setName((String) emitterTableModel.getValueAt(index++, 0));
             String imagePath = emitter.getImagePath();
@@ -221,7 +223,6 @@ class EffectPanel extends JPanel {
 		for (ParticleEmitter emitter : editor.effect.getEmitters())
 			emitter.setName((String)emitterTableModel.getValueAt(index++, 0));
 
-		File outputFile = new File(dir, file);
 		Writer fileWriter = null;
 		try {
 			fileWriter = new FileWriter(outputFile);
