@@ -20,6 +20,8 @@ import java.awt.*;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.io.FileWriter;
+import java.io.Writer;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URL;
@@ -48,6 +50,7 @@ import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.utils.GdxRuntimeException;
+import com.badlogic.gdx.utils.StreamUtils;
 
 public class ParticleEditor extends JFrame {
 	public static final String DEFAULT_PARTICLE = "particle.png";
@@ -64,6 +67,8 @@ public class ParticleEditor extends JFrame {
 	NumericValue pixelsPerMeter;
 	NumericValue zoomLevel;
 	NumericValue deltaMultiplier;
+	String lastDir;
+	JTabbedPane tabbedPane;
 	GradientColorValue backgroundColor;
 
 	float pixelsPerMeterPrev;
@@ -100,6 +105,7 @@ public class ParticleEditor extends JFrame {
 				addEditorRow(new NumericPanel(zoomLevel, "Zoom level", ""));
 				addEditorRow(new NumericPanel(deltaMultiplier, "Delta multiplier", ""));
 				addEditorRow(new GradientPanel(backgroundColor, "Background color", "", true));
+				endEditorRow();
 
 				rowsPanel.removeAll();
 				ParticleEmitter emitter = getEmitter();
@@ -141,8 +147,13 @@ public class ParticleEditor extends JFrame {
 
 	void addEditorRow (JPanel row) {
 		row.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, java.awt.Color.black));
-		editRowsPanel.add(row, new GridBagConstraints(0, -1, 1, 1, 1, 0, GridBagConstraints.CENTER, GridBagConstraints.HORIZONTAL,
+		editRowsPanel.add(row, new GridBagConstraints(0, -1, 1, 1, 1, 0, GridBagConstraints.NORTH, GridBagConstraints.HORIZONTAL,
 			new Insets(0, 0, 0, 0), 0, 0));
+	}
+
+	void endEditorRow () {
+		editRowsPanel.add(Box.createGlue(), new GridBagConstraints(0, -1, 1, 1, 1.0, 1.0, GridBagConstraints.CENTER,
+			GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
 	}
 
 	void addRow (JPanel row) {
@@ -153,7 +164,7 @@ public class ParticleEditor extends JFrame {
 
 	public void setVisible (String name, boolean visible) {
 		for (Component component : rowsPanel.getComponents())
-			if (component instanceof EditorPanel && ((EditorPanel)component).getName().equals(name)) component.setVisible(visible);
+			if (component instanceof EditorPanel && component.getName().equals(name)) component.setVisible(visible);
 	}
 
 	public ParticleEmitter getEmitter () {
@@ -209,6 +220,9 @@ public class ParticleEditor extends JFrame {
 		// JMenu fileMenu = new JMenu("File");
 		// menuBar.add(fileMenu);
 		// }
+
+		tabbedPane = new JTabbedPane();
+
 		splitPane = new JSplitPane();
 		splitPane.setUI(new BasicSplitPaneUI() {
 			public void paint (Graphics g, JComponent jc) {
@@ -225,27 +239,23 @@ public class ParticleEditor extends JFrame {
 			rightSplit.setDividerSize(4);
 			splitPane.add(rightSplit, JSplitPane.RIGHT);
 
+			rightSplit.add(tabbedPane);
+
 			{
-				JPanel propertiesPanel = new JPanel(new GridBagLayout());
-				rightSplit.add(propertiesPanel, JSplitPane.TOP);
-				propertiesPanel.setBorder(new CompoundBorder(BorderFactory.createEmptyBorder(3, 0, 6, 6), BorderFactory
-					.createTitledBorder("Editor Properties")));
+				JScrollPane scroll = new JScrollPane();
+				tabbedPane.addTab("Editor properties", scroll);
+				scroll.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
 				{
-					JScrollPane scroll = new JScrollPane();
-					propertiesPanel.add(scroll, new GridBagConstraints(0, 0, 1, 1, 1, 1, GridBagConstraints.NORTH,
-						GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-					scroll.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));
-					{
-						editRowsPanel = new JPanel(new GridBagLayout());
-						scroll.setViewportView(editRowsPanel);
-						scroll.getVerticalScrollBar().setUnitIncrement(70);
-					}
+					editRowsPanel = new JPanel(new GridBagLayout());
+					scroll.setViewportView(editRowsPanel);
+					scroll.setAlignmentY(JScrollPane.TOP_ALIGNMENT);
+					scroll.getVerticalScrollBar().setUnitIncrement(70);
 				}
 			}
 
 			{
 				JPanel propertiesPanel = new JPanel(new GridBagLayout());
-				rightSplit.add(propertiesPanel, JSplitPane.BOTTOM);
+				tabbedPane.addTab("Emitter Properties", propertiesPanel);
 				propertiesPanel.setBorder(new CompoundBorder(BorderFactory.createEmptyBorder(3, 0, 6, 6), BorderFactory
 					.createTitledBorder("Emitter Properties")));
 				{
@@ -289,7 +299,73 @@ public class ParticleEditor extends JFrame {
 			}
 			leftSplit.setDividerLocation(625);
 		}
+		tabbedPane.setSelectedIndex(1);
 		splitPane.setDividerLocation(325);
+	}
+
+	void openEffect () {
+		FileDialog dialog = new FileDialog(this, "Open Effect", FileDialog.LOAD);
+		if (lastDir != null) dialog.setDirectory(lastDir);
+		dialog.setVisible(true);
+		final String file = dialog.getFile();
+		final String dir = dialog.getDirectory();
+		if (dir == null || file == null || file.trim().length() == 0) return;
+		lastDir = dir;
+		ParticleEffect effect = new ParticleEffect();
+		try {
+			File effectFile = new File(dir, file);
+			effect.loadEmitters(Gdx.files.absolute(effectFile.getAbsolutePath()));
+			this.effect = effect;
+			this.effectFile = effectFile;
+			this.particleData.clear();
+		} catch (Exception ex) {
+			System.out.println("Error loading effect: " + new File(dir, file).getAbsolutePath());
+			ex.printStackTrace();
+			JOptionPane.showMessageDialog(this, "Error opening effect.");
+			return;
+		}
+		for (ParticleEmitter emitter : effect.getEmitters()) {
+			emitter.setPosition(this.worldCamera.viewportWidth / 2, this.worldCamera.viewportHeight / 2);
+		}
+		this.effectPanel.loadEffect(effect);
+		this.reloadRows();
+	}
+
+	void saveEffect () {
+		FileDialog dialog = new FileDialog(this, "Save Effect", FileDialog.SAVE);
+		if (lastDir != null) dialog.setDirectory(lastDir);
+		dialog.setVisible(true);
+		String file = dialog.getFile();
+		String dir = dialog.getDirectory();
+		if (dir == null || file == null || file.trim().length() == 0) return;
+		lastDir = dir;
+		int index = 0;
+		File effectFile = new File(dir, file);
+
+		// save each image path as relative path to effect file directory
+		URI effectDirUri = effectFile.getParentFile().toURI();
+		for (ParticleEmitter emitter : effect.getEmitters()) {
+			emitter.setName(effectPanel.getEmitterName(index++));
+			String imagePath = emitter.getImagePath();
+			if ((imagePath.contains("/") || imagePath.contains("\\")) && !imagePath.contains("..")) {
+				// it's absolute, make it relative:
+				URI imageUri = new File(emitter.getImagePath()).toURI();
+				emitter.setImagePath(effectDirUri.relativize(imageUri).getPath());
+			}
+		}
+
+		File outputFile = new File(dir, file);
+		Writer fileWriter = null;
+		try {
+			fileWriter = new FileWriter(outputFile);
+			effect.save(fileWriter);
+		} catch (Exception ex) {
+			System.out.println("Error saving effect: " + outputFile.getAbsolutePath());
+			ex.printStackTrace();
+			JOptionPane.showMessageDialog(this, "Error saving effect.");
+		} finally {
+			StreamUtils.closeQuietly(fileWriter);
+		}
 	}
 
 	class Renderer implements ApplicationListener, InputProcessor {

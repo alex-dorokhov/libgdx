@@ -19,10 +19,6 @@ package com.badlogic.gdx.tools.particleeditor;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.io.File;
-import java.io.FileWriter;
-import java.io.Writer;
-import java.net.URI;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -31,18 +27,15 @@ import javax.swing.event.TableModelEvent;
 import javax.swing.event.TableModelListener;
 import javax.swing.table.DefaultTableModel;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.ParticleEffect;
 import com.badlogic.gdx.graphics.g2d.ParticleEmitter;
 import com.badlogic.gdx.utils.Array;
-import com.badlogic.gdx.utils.StreamUtils;
 
 class EffectPanel extends JPanel {
 	ParticleEditor editor;
 	JTable emitterTable;
 	DefaultTableModel emitterTableModel;
 	int editIndex;
-	String lastDir;
 
 	public EffectPanel (ParticleEditor editor) {
 		this.editor = editor;
@@ -137,72 +130,17 @@ class EffectPanel extends JPanel {
 		editor.reloadRows();
 	}
 
-	void openEffect () {
-		FileDialog dialog = new FileDialog(editor, "Open Effect", FileDialog.LOAD);
-		if (lastDir != null) dialog.setDirectory(lastDir);
-		dialog.setVisible(true);
-		final String file = dialog.getFile();
-		final String dir = dialog.getDirectory();
-		if (dir == null || file == null || file.trim().length() == 0) return;
-		lastDir = dir;
-		ParticleEffect effect = new ParticleEffect();
-		try {
-			File effectFile = new File(dir, file);
-			effect.loadEmitters(Gdx.files.absolute(effectFile.getAbsolutePath()));
-			editor.effect = effect;
-			editor.effectFile = effectFile;
-			emitterTableModel.getDataVector().removeAllElements();
-			editor.particleData.clear();
-		} catch (Exception ex) {
-			System.out.println("Error loading effect: " + new File(dir, file).getAbsolutePath());
-			ex.printStackTrace();
-			JOptionPane.showMessageDialog(editor, "Error opening effect.");
-			return;
-		}
+	String getEmitterName (int index) {
+		return (String)emitterTableModel.getValueAt(index, 0);
+	}
+
+	void loadEffect (ParticleEffect effect) {
+		emitterTableModel.getDataVector().removeAllElements();
 		for (ParticleEmitter emitter : effect.getEmitters()) {
-			emitter.setPosition(editor.worldCamera.viewportWidth / 2, editor.worldCamera.viewportHeight / 2);
 			emitterTableModel.addRow(new Object[] {emitter.getName(), true});
 		}
 		editIndex = 0;
 		emitterTable.getSelectionModel().setSelectionInterval(editIndex, editIndex);
-		editor.reloadRows();
-	}
-
-	void saveEffect () {
-		FileDialog dialog = new FileDialog(editor, "Save Effect", FileDialog.SAVE);
-		if (lastDir != null) dialog.setDirectory(lastDir);
-		dialog.setVisible(true);
-		String file = dialog.getFile();
-		String dir = dialog.getDirectory();
-		if (dir == null || file == null || file.trim().length() == 0) return;
-		lastDir = dir;
-		int index = 0;
-		File effectFile = new File(dir, file);
-
-		// save each image path as relative path to effect file directory
-		URI effectDirUri = effectFile.getParentFile().toURI();
-		for (ParticleEmitter emitter : editor.effect.getEmitters()) {
-			emitter.setName((String)emitterTableModel.getValueAt(index++, 0));
-			String imagePath = emitter.getImagePath();
-			if ((imagePath.contains("/") || imagePath.contains("\\")) && !imagePath.contains("..")) {
-				// it's absolute, make it relative:
-				URI imageUri = new File(emitter.getImagePath()).toURI();
-				emitter.setImagePath(effectDirUri.relativize(imageUri).getPath());
-			}
-		}
-
-		File outputFile = new File(dir, file);
-		Writer fileWriter = null;
-		try {
-			fileWriter = new FileWriter(outputFile);
-			editor.effect.save(fileWriter);
-		} catch (Exception ex) {
-			System.out.println("Error saving effect: " + outputFile.getAbsolutePath());
-			ex.printStackTrace();
-			JOptionPane.showMessageDialog(editor, "Error saving effect.");
-		} finally {
-			StreamUtils.closeQuietly(fileWriter);
-		}
 	}
 
 	void duplicateEmitter () {
@@ -293,7 +231,7 @@ class EffectPanel extends JPanel {
 					GridBagConstraints.HORIZONTAL, new Insets(0, 0, 6, 0), 0, 0));
 				saveButton.addActionListener(new ActionListener() {
 					public void actionPerformed (ActionEvent event) {
-						saveEffect();
+						editor.saveEffect();
 					}
 				});
 			}
@@ -303,7 +241,7 @@ class EffectPanel extends JPanel {
 					GridBagConstraints.HORIZONTAL, new Insets(0, 0, 6, 0), 0, 0));
 				openButton.addActionListener(new ActionListener() {
 					public void actionPerformed (ActionEvent event) {
-						openEffect();
+						editor.openEffect();
 					}
 				});
 			}
