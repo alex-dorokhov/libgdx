@@ -6,6 +6,10 @@ project.ext.texturePackerMainClass = "com.badlogic.gdx.tools.texturepacker.Textu
 
 project.ext.toolsAssetsDir = ["assets"]
 
+dependencies {
+    runtime files(toolsAssetsDir)
+}
+
 task dist2DParticles (type: Jar) {
     from files(sourceSets.main.output.classesDir)
     from files(sourceSets.main.output.resourcesDir)
