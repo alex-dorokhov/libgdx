@@ -34,6 +34,7 @@ public class ParticleEmitter {
 	static private final int UPDATE_WIND = 1 << 4;
 	static private final int UPDATE_GRAVITY = 1 << 5;
 	static private final int UPDATE_TINT = 1 << 6;
+	static private final int UPDATE_TIGHTNESS = 1 << 7;
 
 	private RangedNumericValue delayValue = new RangedNumericValue();
 	private ScaledNumericValue lifeOffsetValue = new ScaledNumericValue();
@@ -41,6 +42,7 @@ public class ParticleEmitter {
 	private ScaledNumericValue lifeValue = new ScaledNumericValue();
 	private ScaledNumericValue emissionValue = new ScaledNumericValue();
 	private ScaledNumericValue scaleValue = new ScaledNumericValue();
+	private ScaledNumericValue tightnessValue = new ScaledNumericValue();
 	private ScaledNumericValue rotationValue = new ScaledNumericValue();
 	private ScaledNumericValue velocityValue = new ScaledNumericValue();
 	private ScaledNumericValue angleValue = new ScaledNumericValue();
@@ -106,6 +108,7 @@ public class ParticleEmitter {
 		lifeValue.load(emitter.lifeValue);
 		lifeOffsetValue.load(emitter.lifeOffsetValue);
 		scaleValue.load(emitter.scaleValue);
+		tightnessValue.load(emitter.tightnessValue);
 		rotationValue.load(emitter.rotationValue);
 		velocityValue.load(emitter.velocityValue);
 		angleValue.load(emitter.angleValue);
@@ -368,6 +371,7 @@ public class ParticleEmitter {
 		if (angleValue.active && angleValue.timeline.length > 1) updateFlags |= UPDATE_ANGLE;
 		if (velocityValue.active) updateFlags |= UPDATE_VELOCITY;
 		if (scaleValue.timeline.length > 1) updateFlags |= UPDATE_SCALE;
+		if (tightnessValue.timeline.length > 1) updateFlags |= UPDATE_TIGHTNESS;
 		if (rotationValue.active && rotationValue.timeline.length > 1) updateFlags |= UPDATE_ROTATION;
 		if (windValue.active) updateFlags |= UPDATE_WIND;
 		if (gravityValue.active) updateFlags |= UPDATE_GRAVITY;
@@ -411,7 +415,20 @@ public class ParticleEmitter {
 		particle.scale = scaleValue.newLowValue() / spriteWidth;
 		particle.scaleDiff = scaleValue.newHighValue() / spriteWidth;
 		if (!scaleValue.isRelative()) particle.scaleDiff -= particle.scale;
-		particle.setScale(particle.scale + particle.scaleDiff * scaleValue.getScale(0));
+
+		float spriteHeight = sprite.getHeight();
+		if (tightnessValue.isActive()) {
+			particle.tightness = tightnessValue.newLowValue() / spriteHeight;
+			particle.tightnessDiff = tightnessValue.newHighValue() / spriteHeight;
+			if (!tightnessValue.isRelative()) particle.tightnessDiff -= particle.tightness;
+		} else {
+			particle.tightness = 0f;
+			particle.tightnessDiff = 1f;
+		}
+
+		float scale = particle.scale + particle.scaleDiff * scaleValue.getScale(0);
+		float tightness = particle.tightness + particle.tightnessDiff * tightnessValue.getScale(0);
+		particle.setScale(scale, scale * tightness);
 
 		if (rotationValue.active) {
 			particle.rotation = rotationValue.newLowValue();
@@ -513,7 +530,6 @@ public class ParticleEmitter {
 		}
 		}
 
-		float spriteHeight = sprite.getHeight();
 		particle.setBounds(x - spriteWidth / 2, y - spriteHeight / 2, spriteWidth, spriteHeight);
 
 		int offsetTime = (int)(lifeOffset + lifeOffsetDiff * lifeOffsetValue.getScale(percent));
@@ -531,8 +547,19 @@ public class ParticleEmitter {
 		float percent = 1 - particle.currentLife / (float)particle.life;
 		int updateFlags = this.updateFlags;
 
-		if ((updateFlags & UPDATE_SCALE) != 0)
-			particle.setScale(particle.scale + particle.scaleDiff * scaleValue.getScale(percent));
+		if ((updateFlags & UPDATE_SCALE) != 0) {
+			if ((updateFlags & UPDATE_TIGHTNESS) != 0) {
+				float scale = particle.scale + particle.scaleDiff * scaleValue.getScale(percent);
+				float tightness = particle.tightness + particle.tightnessDiff * tightnessValue.getScale(percent);
+				particle.setScale(scale, scale * tightness);
+			} else {
+				particle.setScale(particle.scale + particle.scaleDiff * scaleValue.getScale(percent));
+			}
+		} else if ((updateFlags & UPDATE_TIGHTNESS) != 0) {
+			final float scaleX = particle.getScaleX();
+			float tightness = particle.tightness + particle.tightnessDiff * tightnessValue.getScale(percent);
+			particle.setScale(scaleX, scaleX * tightness);
+		}
 
 		if ((updateFlags & UPDATE_VELOCITY) != 0) {
 			float velocity = (particle.velocity + particle.velocityDiff * velocityValue.getScale(percent)) * delta;
@@ -637,6 +664,10 @@ public class ParticleEmitter {
 
 	public ScaledNumericValue getScale () {
 		return scaleValue;
+	}
+
+	public ScaledNumericValue getTightness() {
+		return tightnessValue;
 	}
 
 	public ScaledNumericValue getRotation () {
@@ -906,6 +937,9 @@ public class ParticleEmitter {
 		output.write("premultipliedAlpha: " + premultipliedAlpha + "\n");
 		output.write("- Image Path -\n");
 		output.write(imagePath + "\n");
+		output.write("- Tightness - \n");
+		tightnessValue.save(output);
+		output.write("\n");
 	}
 
 	public void load (BufferedReader reader) throws IOException {
@@ -964,6 +998,11 @@ public class ParticleEmitter {
 				reader.readLine();
 			}
 			setImagePath(reader.readLine());
+			if ("- Tightness -".equals(reader.readLine())) {
+				tightnessValue.load(reader);
+			} else {
+				tightnessValue.setActive(false);
+			}
 		} catch (RuntimeException ex) {
 			if (name == null) throw ex;
 			throw new RuntimeException("Error parsing emitter: " + name, ex);
@@ -999,6 +1038,7 @@ public class ParticleEmitter {
 	public static class Particle extends Sprite {
 		protected int life, currentLife;
 		protected float scale, scaleDiff;
+		protected float tightness, tightnessDiff;
 		protected float rotation, rotationDiff;
 		protected float velocity, velocityDiff;
 		protected float angle, angleDiff;

@@ -233,6 +233,11 @@ public class ParticleEffect implements Disposable {
 			particleEmitter.getScale().setLow(particleEmitter.getScale().getLowMin() * scaleFactor,
 				particleEmitter.getScale().getLowMax() * scaleFactor);
 
+			particleEmitter.getTightness().setHigh(particleEmitter.getTightness().getHighMin() * scaleFactor,
+				particleEmitter.getTightness().getHighMax() * scaleFactor);
+			particleEmitter.getTightness().setLow(particleEmitter.getTightness().getLowMin() * scaleFactor,
+				particleEmitter.getTightness().getLowMax() * scaleFactor);
+
 			particleEmitter.getVelocity().setHigh(particleEmitter.getVelocity().getHighMin() * scaleFactor,
 				particleEmitter.getVelocity().getHighMax() * scaleFactor);
 			particleEmitter.getVelocity().setLow(particleEmitter.getVelocity().getLowMin() * scaleFactor,
